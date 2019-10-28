@@ -25,9 +25,9 @@ func SetLogSeverity(severity Severity) {
 	logSeverity = severity
 }
 
-func SetElasticClient(service, customer string, config elasticsearch.Config) error {
-	validateElasticsearchConfig(service, customer, config)
-	customerIndex = "logs-" + customer
+func SetElasticClient(service, user string, config elasticsearch.Config) error {
+	validateElasticsearchConfig(service, user, config)
+	customerIndex = "logs-" + user
 	serviceName = service
 	var err error
 	esClient, err = elasticsearch.NewClient(config)
@@ -35,9 +35,9 @@ func SetElasticClient(service, customer string, config elasticsearch.Config) err
 	return err
 }
 
-func validateElasticsearchConfig(service, customer string, config elasticsearch.Config) {
-	if customer == "" {
-		Warn("customer not set, falling back to undefined. \n\t\t ==> Logs will not be sent")
+func validateElasticsearchConfig(service, user string, config elasticsearch.Config) {
+	if user == "" {
+		Warn("user not set, falling back to undefined. \n\t\t ==> Logs will not be sent")
 	}
 	if service == "" {
 		Warn("service not set, falling back to undefined. \n\t\t ==> Logs will not be sent")

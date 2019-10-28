@@ -13,7 +13,6 @@ func main() {
 	pflag.String("elk-service", "", "The name of the service, for easier retrieval down the line. e.g. cart")
 	pflag.String("elk-user", "", "Username with create access on the correct Elastic Index")
 	pflag.String("elk-pass", "", "Password for provided user")
-	pflag.String("elk-customer", "", "The name of the customer, for easier retrieval")
 	pflag.Int("log-level", int(logging.INFO), "set the log level to display")
 
 	pflag.Parse()
@@ -34,7 +33,7 @@ func main() {
 func setUpElasticClient() {
 	if err := logging.SetElasticClient(
 		viper.GetString("elk-service"),
-		viper.GetString("elk-customer"),
+		viper.GetString("elk-user"),
 		elasticsearch.Config{
 			Addresses: []string{viper.GetString("elk-cloud-addr")},
 			Username:  viper.GetString("elk-user"),
