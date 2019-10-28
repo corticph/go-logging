@@ -26,15 +26,16 @@ func SetLogSeverity(severity Severity) {
 }
 
 func SetElasticClient(service, customer string, config elasticsearch.Config) error {
-	validateElasticsearchConfig(customer, config)
+	validateElasticsearchConfig(service, customer, config)
 	customerIndex = "logs-" + customer
 	serviceName = service
-	esClient, err := elasticsearch.NewClient(config)
+	var err error
+	esClient, err = elasticsearch.NewClient(config)
 
 	return err
 }
 
-func validateElasticsearchConfig(service string, customer string, config elasticsearch.Config) {
+func validateElasticsearchConfig(service, customer string, config elasticsearch.Config) {
 	if customer == "" {
 		Warn("customer not set, falling back to undefined. \n\t\t ==> Logs will not be sent")
 	}
@@ -100,7 +101,7 @@ func SendToElasticServer(event LogLine) {
 	}
 	res, err := esClient.Index(customerIndex, bytes.NewReader(logJSON))
 	if err != nil {
-		log.Printf("Error getting response: %e", err)
+		log.Printf("Error sending logs to esl. error in the response: %v", err)
 		return
 	}
 	if res.IsError() {
@@ -213,3 +214,12 @@ var (
 	// EMPTY represents a description of nothing
 	EMPTY = ""
 )
+
+// SentryIOErrorTag returns a value used for sending an error level
+// tag to SentryIO together with the CaptureError(AndWait) functions
+// based on the severity input
+func SentryIOErrorTag(severity Severity) map[string]string {
+	return map[string]string{
+		"level": severity.ToString(),
+	}
+}

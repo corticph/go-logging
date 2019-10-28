@@ -2,6 +2,9 @@ package main
 
 import (
 	"github.com/corticph/go-logging/pkg/logging"
+	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 )
 
 func main() {
@@ -11,6 +14,7 @@ func main() {
 	pflag.String("elk-user", "", "Username with create access on the correct Elastic Index")
 	pflag.String("elk-pass", "", "Password for provided user")
 	pflag.String("elk-customer", "", "The name of the customer, for easier retrieval")
+	pflag.Int("log-level", int(logging.INFO), "set the log level to display")
 
 	pflag.Parse()
 
@@ -18,9 +22,11 @@ func main() {
 		panic(err)
 	}
 
+	logging.SetLogSeverity(logging.Severity(viper.GetInt("log-level")))
+
 	setUpElasticClient()
 
-	logging.Log("Hello world!")
+	logging.Info("Hello world!")
 
 }
 
