@@ -27,7 +27,7 @@ func SetLogSeverity(severity Severity) {
 
 func SetElasticClient(service string, config elasticsearch.Config) error {
 	if isValidELSConfig(service, config) {
-		customerIndex = "logs-" + user
+		customerIndex = "logs-" + config.Username
 		serviceName = service
 		var err error
 		esClient, err = elasticsearch.NewClient(config)

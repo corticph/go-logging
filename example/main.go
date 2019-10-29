@@ -33,7 +33,6 @@ func main() {
 func setUpElasticClient() {
 	if err := logging.SetElasticClient(
 		viper.GetString("elk-service"),
-		viper.GetString("elk-user"),
 		elasticsearch.Config{
 			Addresses: []string{viper.GetString("elk-cloud-addr")},
 			Username:  viper.GetString("elk-user"),
