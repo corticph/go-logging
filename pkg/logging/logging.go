@@ -26,29 +26,25 @@ func SetLogSeverity(severity Severity) {
 }
 
 func SetElasticClient(service, user string, config elasticsearch.Config) error {
-	validateElasticsearchConfig(service, user, config)
-	customerIndex = "logs-" + user
-	serviceName = service
-	var err error
-	esClient, err = elasticsearch.NewClient(config)
+	if isValidELSConfig(service, user, config) {
+		customerIndex = "logs-" + user
+		serviceName = service
+		var err error
+		esClient, err = elasticsearch.NewClient(config)
 
-	return err
+		return err
+	}
+
+	return nil
 }
 
-func validateElasticsearchConfig(service, user string, config elasticsearch.Config) {
-	if user == "" {
-		Warn("user not set, falling back to undefined. \n\t\t ==> Logs will not be sent")
+// evaluate if we have all the flags needed to setup the elastic search client.
+func isValidELSConfig(service string, config elasticsearch.Config) bool {
+	if service == "" || len(config.Addresses) == 0 || config.Username == "" || config.Password == "" {
+		Warn("missing parameters for the elastic search client, skipping logging to it.")
+		return false
 	}
-	if service == "" {
-		Warn("service not set, falling back to undefined. \n\t\t ==> Logs will not be sent")
-	}
-	if len(config.Addresses) == 0 {
-		Warn("-- Address not specified for Elasticsearch log")
-	} else {
-		if config.Addresses[0] == "" || config.Username == "" || config.Password == "" {
-			Warn(" -- either adress, username or password not provided \n\t\t ==> Logs will not be sent")
-		}
-	}
+	return true
 }
 
 func Debug(msg string) {
