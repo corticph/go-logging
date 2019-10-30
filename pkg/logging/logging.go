@@ -15,6 +15,9 @@ var logSeverity = INFO
 var esClient *elasticsearch.Client
 var customerIndex string
 var serviceName string
+var loggerSet bool
+
+var logchannel chan LogLine
 
 func init() {
 	log.SetOutput(os.Stdout)
@@ -25,7 +28,18 @@ func SetLogSeverity(severity Severity) {
 	logSeverity = severity
 }
 
-func SetElasticClient(service string, config elasticsearch.Config) error {
+func SetElasticClient(processors int, service string, config elasticsearch.Config) error {
+	if !loggerSet { // ensure that logger is only set once per execution
+		if err := setElasticClient(service, config); err != nil {
+			return err
+		}
+		logchannel = newLogListener(processors)
+		loggerSet = true
+	}
+	return nil
+}
+
+func setElasticClient(service string, config elasticsearch.Config) error {
 	if isValidELSConfig(service, config) {
 		customerIndex = "logs-" + config.Username
 		serviceName = service
@@ -34,8 +48,40 @@ func SetElasticClient(service string, config elasticsearch.Config) error {
 
 		return err
 	}
-
 	return nil
+}
+
+func newLogListener(procs int) chan LogLine {
+	channel := make(chan LogLine)
+	for i := 0; i < getIntOrDefault(procs, 100); i ++ {
+		go func() {
+			for logline := range channel {
+				sendToElasticServer(logline)
+			}
+		}()
+	}
+	return channel
+}
+
+func getIntOrDefault(i, defaultInt int) int {
+	if i == 0 {
+		return defaultInt
+	}
+	return i
+}
+
+func sendToElasticServer(event LogLine) {
+	logJSON, err := json.Marshal(event)
+	if err != nil {
+		Errf(err.Error())
+	}
+	res, err := esClient.Index(customerIndex, bytes.NewReader(logJSON))
+	if err != nil {
+		Errf("Error sending logs to esl. error in the response: %v", err)
+	}
+	if res.IsError() {
+		Errf("Response was error: %v", res.String())
+	}
 }
 
 // evaluate if we have all the flags needed to setup the elastic search client.
@@ -86,25 +132,6 @@ func LogfAs(severity Severity, format string, a ...interface{}) {
 	Log(NewLogMsg(fmt.Sprintf(format, a...), severity))
 }
 
-func (logline LogLine) String() string {
-	return fmt.Sprintf("%s [%s] %s", logline.Timestamp, logline.LogLevel, logline.Message)
-}
-
-func SendToElasticServer(event LogLine) {
-	logJSON, err := json.Marshal(event)
-	if err != nil {
-		log.Printf("Error %e", err)
-	}
-	res, err := esClient.Index(customerIndex, bytes.NewReader(logJSON))
-	if err != nil {
-		log.Printf("Error sending logs to esl. error in the response: %v", err)
-		return
-	}
-	if res.IsError() {
-		log.Printf("Response was error: %v", res.String())
-	}
-}
-
 func Log(msgs ...Message) {
 	for _, msg := range msgs {
 		if msg == nil {
@@ -123,7 +150,7 @@ func Log(msgs ...Message) {
 			log.Printf(logline.String())
 
 			if esClient != nil {
-				SendToElasticServer(logline)
+				logchannel <- logline
 			}
 		}
 	}
@@ -135,6 +162,10 @@ type LogLine struct {
 	Message     string `json:"message"`
 	ServiceName string `json:"service.name"`
 	LogLevel    string `json:"log.level"`
+}
+
+func (logline LogLine) String() string {
+	return fmt.Sprintf("%s [%s] %s", logline.Timestamp, logline.LogLevel, logline.Message)
 }
 
 type Message interface {
