@@ -53,7 +53,7 @@ func setElasticClient(service string, config elasticsearch.Config) error {
 
 func newLogListener(procs int) chan LogLine {
 	channel := make(chan LogLine)
-	for i := 0; i < getIntOrDefault(procs, 100); i ++ {
+	for i := 0; i < getIntOrDefault(procs, 100); i++ {
 		go func() {
 			for logline := range channel {
 				sendToElasticServer(logline)
@@ -74,13 +74,16 @@ func sendToElasticServer(event LogLine) {
 	logJSON, err := json.Marshal(event)
 	if err != nil {
 		Errf(err.Error())
+		return
 	}
 	res, err := esClient.Index(customerIndex, bytes.NewReader(logJSON))
 	if err != nil {
 		Errf("Error sending logs to esl. error in the response: %v", err)
+		return
 	}
 	if res.IsError() {
 		Errf("Response was error: %v", res.String())
+		return
 	}
 }
 
