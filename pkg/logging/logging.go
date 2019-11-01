@@ -36,6 +36,7 @@ func SetElasticClient(processors int, service string, config elasticsearch.Confi
 		logchannel = newLogListener(processors)
 		loggerSet = true
 	}
+	Info("initialized elastic client without errors")
 	return nil
 }
 
