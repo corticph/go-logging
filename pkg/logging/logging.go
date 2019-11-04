@@ -84,7 +84,6 @@ func sendToElasticServer(event LogLine) {
 	}
 	if res.IsError() {
 		log.Printf("got an error response after sending logs to elastic search. response was: %v", res)
-		return
 	}
 	res.Body.Close()
 }

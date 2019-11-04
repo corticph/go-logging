@@ -39,8 +39,9 @@ func TestNonBlocking(t *testing.T) {
 
 	config := readESConfigs("esconfig.json")
 
+	// use too many processes on purpouse to get some errors back
 	err := SetElasticClient(
-		0,
+		1000,
 		"test",
 		elasticsearch.Config{
 			Addresses: []string{config["elk-cloud-addr"]},
