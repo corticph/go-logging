@@ -57,17 +57,3 @@ func TestNonBlocking(t *testing.T) {
 
 	}
 }
-
-//func TestMissingConfigs(t *testing.T) {
-//
-//	err := SetElasticClient(
-//		0,
-//		"bla",
-//		elasticsearch.Config{
-//			Addresses: []string{"test"},
-//		},
-//	)
-//
-//	Info("Hello info!")
-//
-//}

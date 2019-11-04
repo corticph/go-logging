@@ -86,6 +86,7 @@ func sendToElasticServer(event LogLine) {
 		log.Printf("got an error response after sending logs to elastic search. response was: %v", res)
 		return
 	}
+	res.Body.Close()
 }
 
 // evaluate if we have all the flags needed to setup the elastic search client.

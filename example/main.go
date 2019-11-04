@@ -38,7 +38,6 @@ func main() {
 
 	if viper.GetBool("stress-test") {
 		for i := 0; i < 1000; i++ {
-			time.Sleep(1)
 			logging.Info("Sending stress test logs!!")
 
 		}
