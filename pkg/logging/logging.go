@@ -74,16 +74,16 @@ func getIntOrDefault(i, defaultInt int) int {
 func sendToElasticServer(event LogLine) {
 	logJSON, err := json.Marshal(event)
 	if err != nil {
-		Errf(err.Error())
+		log.Printf("got an error while marshling event to json: %v", err)
 		return
 	}
 	res, err := esClient.Index(customerIndex, bytes.NewReader(logJSON))
 	if err != nil {
-		Errf("Error sending logs to esl. error in the response: %v", err)
+		log.Printf("got an error while sending log to elastic search: %v", err)
 		return
 	}
 	if res.IsError() {
-		Errf("Response was error: %v", res.String())
+		log.Printf("got an error response after sending logs to elastic search. response was: %v", res)
 		return
 	}
 }
