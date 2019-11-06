@@ -23,11 +23,19 @@ func init() {
 	log.SetOutput(os.Stdout)
 }
 
+// SetLogSeverity will determine which log to output to the console, as well as elasticsearch.
+// Anything equal to or higher in severity will be logged. In other words, if the severity
+// `ERROR` is passed to this function, the global logging level will be set to `ERROR` and will
+// therefore never log `DEBUG`, `INFO` & `WARNING`.
 func SetLogSeverity(severity Severity) {
 	LogfAs(INFO, "Log level set to: %s", severity.ToString())
 	logSeverity = severity
 }
 
+// SetElasticClient will create an elasticsearch logger client, which the information given
+// on function invokation. You cannot instatiate the elastic client more than once, and any
+// attempt of setting it more than once, will produce an error. This is to avoid unwanted
+// processor instatiation.
 func SetElasticClient(processors int, service string, config elasticsearch.Config) error {
 	if !loggerSet { // ensure that logger is only set once per execution
 		if err := setElasticClient(service, config); err != nil {
@@ -97,45 +105,60 @@ func isValidELSConfig(service string, config elasticsearch.Config) bool {
 	return true
 }
 
+// Debug will log a debug message
 func Debug(msg string) {
 	LogAs(DEBUG, msg)
 }
 
+// Debugf will log a debug message
 func Debugf(format string, a ...interface{}) {
 	LogfAs(DEBUG, format, a...)
 }
 
+// Info will log an info message
 func Info(msg string) {
 	LogAs(INFO, msg)
 }
 
+// Infof will log an info message
 func Infof(format string, a ...interface{}) {
 	LogfAs(INFO, format, a...)
 }
 
+// Warn will log a warn message
 func Warn(msg string) {
 	LogAs(WARN, msg)
 }
 
+// Warnf will log a warn message
 func Warnf(format string, a ...interface{}) {
 	LogfAs(WARN, format, a...)
 }
 
+// Err will log an error message
 func Err(msg string) {
 	LogAs(ERROR, msg)
 }
 
+// Errf will log an error message
 func Errf(format string, a ...interface{}) {
 	LogfAs(ERROR, format, a...)
 }
+
+// LogAs will log an error message with the given severity level
 func LogAs(severity Severity, msg string) {
 	Log(NewLogMsg(msg, severity))
 }
 
+// LogfAs will log an error message with the given severity level
 func LogfAs(severity Severity, format string, a ...interface{}) {
 	Log(NewLogMsg(fmt.Sprintf(format, a...), severity))
 }
 
+// Log will log all given error messages which are equal to or above the
+// current global severity level. Messages determined above the global
+// severity level, will be output to console as well as being sent to
+// elasicsearch (messages with `ERROR` or higher will be sent to SentryIO)
 func Log(msgs ...Message) {
 	for _, msg := range msgs {
 		if msg == nil {
@@ -160,6 +183,8 @@ func Log(msgs ...Message) {
 	}
 }
 
+// LogLine is a struct containing all information necessary for sending
+// messages with sufficient metadata to elasticsearch
 type LogLine struct {
 	Timestamp   string `json:"@timestamp"`
 	Original    string `json:"event.original"`
@@ -168,21 +193,25 @@ type LogLine struct {
 	LogLevel    string `json:"log.level"`
 }
 
+// String will return a string definition of the LogLine
 func (logline LogLine) String() string {
 	return fmt.Sprintf("%s [%s] %s", logline.Timestamp, logline.LogLevel, logline.Message)
 }
 
+// Messsage is an interface representing a log message
 type Message interface {
 	Severity() Severity
 	String() string
 	Error() string
 }
 
+// LogMessage implements the Message interface and is the primary struct representing log messages
 type LogMessage struct {
 	severity Severity
 	text     string
 }
 
+// NewLogMsg will instatiate and return a new LogMessage
 func NewLogMsg(text string, severity Severity) LogMessage {
 	return LogMessage{
 		severity: severity,
@@ -190,14 +219,17 @@ func NewLogMsg(text string, severity Severity) LogMessage {
 	}
 }
 
+// Severity will return the severity
 func (msg LogMessage) Severity() Severity {
 	return msg.severity
 }
 
+// String will return the text of the log message
 func (msg LogMessage) String() string {
 	return msg.text
 }
 
+// Error will return the text of the log message
 func (msg LogMessage) Error() string {
 	return msg.String()
 }

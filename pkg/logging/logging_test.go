@@ -13,7 +13,6 @@ func readESConfigs(path string) map[string]string {
 	var config map[string]string
 
 	jsonFile, err := os.Open(path)
-	// if we os.Open returns an error then handle it
 	if err != nil {
 		panic(err)
 	}
