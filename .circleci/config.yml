@@ -1,0 +1,46 @@
+defaults: &defaults
+  docker:
+    - image: circleci/golang:1.13
+  working_directory: /go/src/github.com/corticph/go-logging
+
+  #  orbs:
+  #  aws-ecr: circleci/aws-ecr@6.5.0
+version: 2.0
+jobs:
+  setup:
+    <<: *defaults
+
+    steps:
+      - checkout
+      - run: go get -v -t -d ./...
+      - run: go mod vendor
+      - persist_to_workspace:
+          root: .
+          paths:
+            - .
+
+
+  build:
+    <<: *defaults
+    steps:
+      - attach_workspace:
+          at: /go/src/github.com/corticph/go-logging
+      - run: make
+
+  test:
+    <<: *defaults
+    steps:
+      - attach_workspace:
+          at: /go/src/github.com/corticph/go-logging
+      - run: go test -v ./...
+
+workflows:
+  build-and-test:
+    jobs:
+      - setup
+      - build:
+          requires:
+            - setup
+      - test:
+          requires:
+            - setup
