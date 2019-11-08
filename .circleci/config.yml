@@ -17,13 +17,12 @@ jobs:
           paths:
             - .
 
-
   build:
     <<: *defaults
     steps:
       - attach_workspace:
           at: /go/src/github.com/corticph/go-logging
-      - run: make
+      - run: go build -o dist/example example/main.go
 
   test:
     <<: *defaults
