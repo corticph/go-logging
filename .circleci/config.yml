@@ -3,9 +3,7 @@ defaults: &defaults
     - image: circleci/golang:1.13
   working_directory: /go/src/github.com/corticph/go-logging
 
-  #  orbs:
-  #  aws-ecr: circleci/aws-ecr@6.5.0
-version: 2.0
+version: 2.1
 jobs:
   setup:
     <<: *defaults
