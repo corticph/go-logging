@@ -2,25 +2,43 @@ package logging
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/getsentry/raven-go"
 	"log"
 	"os"
 	"time"
+
+	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/getsentry/raven-go"
 )
 
-var logSeverity = INFO
-var esClient *elasticsearch.Client
-var customerIndex string
-var serviceName string
-var loggerSet bool
-
-var logchannel chan LogLine
+var (
+	logSeverity   = INFO
+	esClient      *elasticsearch.Client
+	customerIndex string
+	serviceName   string
+	loggerSet     bool
+	logchannel    chan LogLine
+	cancel        context.CancelFunc
+)
 
 func init() {
 	log.SetOutput(os.Stdout)
+}
+
+func resetLoggingSettings() {
+	if cancel != nil {
+		cancel()
+	}
+
+	logSeverity = INFO
+	esClient = nil
+	customerIndex = ""
+	serviceName = ""
+	loggerSet = false
+	logchannel = nil
+	cancel = nil
 }
 
 // SetLogSeverity will determine which log to output to the console, as well as elasticsearch.
@@ -41,7 +59,7 @@ func SetElasticClient(processors int, service string, config elasticsearch.Confi
 		if err := setElasticClient(service, config); err != nil {
 			return err
 		}
-		logchannel = newLogListener(processors)
+		logchannel, cancel = newLogListener(processors)
 		loggerSet = true
 	}
 	Info("initialized elastic client without errors")
@@ -60,16 +78,33 @@ func setElasticClient(service string, config elasticsearch.Config) error {
 	return nil
 }
 
-func newLogListener(procs int) chan LogLine {
+// evaluate if we have all the flags needed to setup the elastic search client.
+func isValidELSConfig(service string, config elasticsearch.Config) bool {
+	if service == "" || len(config.Addresses) == 0 || config.Username == "" || config.Password == "" {
+		Warn("missing parameters for the elastic search client, skipping logging to it.")
+		Warnf("%+v", config)
+		return false
+	}
+	return true
+}
+
+func newLogListener(procs int) (chan LogLine, context.CancelFunc) {
 	channel := make(chan LogLine)
+	ctx, cancel := context.WithCancel(context.Background())
 	for i := 0; i < getIntOrDefault(procs, 100); i++ {
 		go func() {
-			for logline := range channel {
-				sendToElasticServer(logline)
+			for {
+				select {
+				case logline := <-channel:
+					sendToElasticServer(logline)
+				case <-ctx.Done():
+					log.Println("Stopping logging service, due to a forced cancel")
+					return
+				}
 			}
 		}()
 	}
-	return channel
+	return channel, cancel
 }
 
 func getIntOrDefault(i, defaultInt int) int {
@@ -85,6 +120,9 @@ func sendToElasticServer(event LogLine) {
 		log.Printf("got an error while marshling event to json: %v", err)
 		return
 	}
+	if esClient == nil {
+		return
+	}
 	res, err := esClient.Index(customerIndex, bytes.NewReader(logJSON))
 	if err != nil {
 		log.Printf("got an error while sending log to elastic search: %v", err)
@@ -94,15 +132,6 @@ func sendToElasticServer(event LogLine) {
 		log.Printf("got an error response after sending logs to elastic search. response was: %v", res)
 	}
 	res.Body.Close()
-}
-
-// evaluate if we have all the flags needed to setup the elastic search client.
-func isValidELSConfig(service string, config elasticsearch.Config) bool {
-	if service == "" || len(config.Addresses) == 0 || config.Username == "" || config.Password == "" {
-		Warn("missing parameters for the elastic search client, skipping logging to it.")
-		return false
-	}
-	return true
 }
 
 // Debug will log a debug message
@@ -145,6 +174,16 @@ func Errf(format string, a ...interface{}) {
 	LogfAs(ERROR, format, a...)
 }
 
+// Fatal will log a fatal error message
+func Fatal(msg string) {
+	LogAs(FATAL, msg)
+}
+
+// Fatalf will log a formatted fatal error message
+func Fatalf(format string, a ...interface{}) {
+	LogfAs(FATAL, format, a...)
+}
+
 // LogAs will log an error message with the given severity level
 func LogAs(severity Severity, msg string) {
 	Log(NewLogMsg(msg, severity))
@@ -176,7 +215,7 @@ func Log(msgs ...Message) {
 			}
 			log.Printf(logline.String())
 
-			if esClient != nil {
+			if logchannel != nil {
 				logchannel <- logline
 			}
 		}
@@ -198,7 +237,7 @@ func (logline LogLine) String() string {
 	return fmt.Sprintf("%s [%s] %s", logline.Timestamp, logline.LogLevel, logline.Message)
 }
 
-// Messsage is an interface representing a log message
+// Message is an interface representing a log message
 type Message interface {
 	Severity() Severity
 	String() string
@@ -259,7 +298,7 @@ func (severity Severity) ToString() string {
 
 var (
 	// FATAL is an msgor severe enough to end an application
-	FATAL Severity = 0
+	FATAL Severity
 
 	// ERROR is an msgor which is unexpected, but not severe enough to exit the application
 	ERROR Severity = 1

@@ -1,59 +1,45 @@
 package logging
 
 import (
-	"encoding/json"
-	"github.com/elastic/go-elasticsearch/v8"
-	"io/ioutil"
-	"os"
 	"testing"
+
+	"github.com/elastic/go-elasticsearch/v8"
+	"gotest.tools/assert"
 )
 
-func readESConfigs(path string) map[string]string {
+func TestSetLogSeverity(t *testing.T) {
+	defer resetLoggingSettings()
 
-	var config map[string]string
-
-	jsonFile, err := os.Open(path)
-	if err != nil {
-		panic(err)
-	}
-	defer jsonFile.Close()
-
-	byteValue, err := ioutil.ReadAll(jsonFile)
-
-	if err != nil {
-		panic(err)
-	}
-
-	err = json.Unmarshal(byteValue, &config)
-	if err != nil {
-		panic(err)
-	}
-
-	return config
+	SetLogSeverity(DEBUG)
+	assert.Assert(t, logSeverity == DEBUG)
 }
 
-// make sure we can call a bunch of logs
-// without the program blocking execution
-func TestNonBlocking(t *testing.T) {
+func TestSetElasticClient(t *testing.T) {
+	defer resetLoggingSettings()
 
-	config := readESConfigs("esconfig.json")
+	assert.Assert(t, loggerSet == false)
+	assert.Assert(t, SetElasticClient(0, "go-logging-test", elasticsearch.Config{}) == nil)
+	assert.Assert(t, loggerSet == true)
+}
 
-	// use too many processes on purpouse to get some errors back
-	err := SetElasticClient(
-		1000,
-		"test",
-		elasticsearch.Config{
-			Addresses: []string{config["elk-cloud-addr"]},
-			Username:  config["elk-user"],
-			Password:  config["elk-pass"],
-		})
+func TestSetElasticClientErrror(t *testing.T) {
+	defer resetLoggingSettings()
 
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.Assert(t, loggerSet == false)
+	assert.Assert(t, SetElasticClient(1, "go-logging-test", elasticsearch.Config{
+		Username:  "wrong",
+		Password:  "credentials",
+		Addresses: []string{"http://are.wrong.com"},
+	}) == nil)
+	assert.Assert(t, loggerSet == true)
 
-	for i := 0; i < 1000; i++ {
-		Info("Sending stress test logs!!")
+	Debug("message")
+	Debugf("mess%s", "age")
+	Infof("mess%s", "age")
+	Err("message")
+	Errf("mess%s", "age")
+	Fatal("message")
+	Fatalf("mess%s", "age")
+	Log(nil)
 
-	}
 }
