@@ -20,7 +20,7 @@ func NewLogLine(msg Message) LogLine {
 	return LogLine{
 		Timestamp:   time.Now().UTC().Format(time.RFC3339),
 		Message:     msg.String(),
-		ServiceName: glogger.client.name,
+		ServiceName: glogger.client.service,
 		LogLevel:    msg.Severity().ToString(),
 	}
 }
