@@ -86,11 +86,10 @@ func getIntOrDefault(i, defaultInt int) int {
 	return i
 }
 
-func (logger *Logger) destroy() *Logger {
+func (logger *Logger) destroy() {
 	if logger.cancel != nil {
 		logger.cancel()
 	}
-	return NewLogger(INFO, 1)
 }
 
 // SetElasticClient will set the contained elastic client using the given input parameters
