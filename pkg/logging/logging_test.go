@@ -1,59 +1,73 @@
 package logging
 
 import (
-	"encoding/json"
-	"github.com/elastic/go-elasticsearch/v8"
-	"io/ioutil"
-	"os"
 	"testing"
+
+	"github.com/elastic/go-elasticsearch/v8"
+	"gotest.tools/assert"
 )
 
-func readESConfigs(path string) map[string]string {
+func TestSetLogSeverity(t *testing.T) {
+	defer reset(t)
 
-	var config map[string]string
-
-	jsonFile, err := os.Open(path)
-	if err != nil {
-		panic(err)
-	}
-	defer jsonFile.Close()
-
-	byteValue, err := ioutil.ReadAll(jsonFile)
-
-	if err != nil {
-		panic(err)
-	}
-
-	err = json.Unmarshal(byteValue, &config)
-	if err != nil {
-		panic(err)
-	}
-
-	return config
+	assert.Assert(t, glogger.severity == INFO)
+	SetLogSeverity(DEBUG)
+	assert.Assert(t, glogger.severity == DEBUG)
 }
 
-// make sure we can call a bunch of logs
-// without the program blocking execution
-func TestNonBlocking(t *testing.T) {
+func reset(t *testing.T) {
+	t.Helper()
 
-	config := readESConfigs("esconfig.json")
+	glogger.destroy()
+	glogger = NewLogger(INFO, 1)
+}
 
-	// use too many processes on purpouse to get some errors back
-	err := SetElasticClient(
-		1000,
-		"test",
-		elasticsearch.Config{
-			Addresses: []string{config["elk-cloud-addr"]},
-			Username:  config["elk-user"],
-			Password:  config["elk-pass"],
-		})
+func TestSetElasticClientTwiceNoParameters(t *testing.T) {
+	logger := NewLogger(INFO, 1)
 
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.Assert(t, logger.SetElasticClient("go-logging-test", elasticsearch.Config{}) == nil)
+	assert.Assert(t, logger.SetElasticClient("go-logging-test", elasticsearch.Config{}) == nil)
+}
 
-	for i := 0; i < 1000; i++ {
-		Info("Sending stress test logs!!")
+func TestSetGlobalElasticClientWithParameters(t *testing.T) {
+	defer reset(t)
 
-	}
+	assert.Assert(t, SetElasticClient(1, "go-logging-test", elasticsearch.Config{
+		Username:  "wrong",
+		Password:  "credentials",
+		Addresses: []string{"http://are.wrong.com"},
+	}) == nil)
+
+	SetLogSeverity(DEBUG)
+	Debug("message")
+	Debugf("mess%s", "age")
+	Info("message")
+	Infof("mess%s", "age")
+	Warnf("mess%s", "age")
+	Err("message")
+	Errf("mess%s", "age")
+	Fatal("message")
+	Fatalf("mess%s", "age")
+	Log(nil)
+}
+
+func TestWithoutElasticSearchInitialised(t *testing.T) {
+	SetLogSeverity(DEBUG)
+	Debug("message")
+	Debugf("mess%s", "age")
+	Info("message")
+	Infof("mess%s", "age")
+	Warnf("mess%s", "age")
+	Err("message")
+	Errf("mess%s", "age")
+	Fatal("message")
+	Fatalf("mess%s", "age")
+	LogAs(ERROR, "messagge")
+	LogfAs(ERROR, "mess%s", "age")
+	Log(nil)
+}
+
+func TestNewLogger(t *testing.T) {
+	logger := NewLogger(INFO, 1)
+	assert.Assert(t, logger.severity == INFO)
 }

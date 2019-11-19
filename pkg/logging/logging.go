@@ -1,209 +1,31 @@
 package logging
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/getsentry/raven-go"
 	"log"
 	"os"
-	"time"
+
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
-var logSeverity = INFO
-var esClient *elasticsearch.Client
-var customerIndex string
-var serviceName string
-var loggerSet bool
-
-var logchannel chan LogLine
+var (
+	glogger *Logger
+)
 
 func init() {
 	log.SetOutput(os.Stdout)
+	glogger = NewLogger(INFO, 1)
 }
 
-// SetLogSeverity will determine which log to output to the console, as well as elasticsearch.
-// Anything equal to or higher in severity will be logged. In other words, if the severity
-// `ERROR` is passed to this function, the global logging level will be set to `ERROR` and will
-// therefore never log `DEBUG`, `INFO` & `WARNING`.
-func SetLogSeverity(severity Severity) {
-	LogfAs(INFO, "Log level set to: %s", severity.ToString())
-	logSeverity = severity
-}
-
-// SetElasticClient will create an elasticsearch logger client, which the information given
-// on function invokation. You cannot instatiate the elastic client more than once, and any
-// attempt of setting it more than once, will produce an error. This is to avoid unwanted
-// processor instatiation.
-func SetElasticClient(processors int, service string, config elasticsearch.Config) error {
-	if !loggerSet { // ensure that logger is only set once per execution
-		if err := setElasticClient(service, config); err != nil {
-			return err
-		}
-		logchannel = newLogListener(processors)
-		loggerSet = true
-	}
-	Info("initialized elastic client without errors")
-	return nil
-}
-
-func setElasticClient(service string, config elasticsearch.Config) error {
-	if isValidELSConfig(service, config) {
-		customerIndex = "logs-" + config.Username
-		serviceName = service
-		var err error
-		esClient, err = elasticsearch.NewClient(config)
-
-		return err
-	}
-	return nil
-}
-
-func newLogListener(procs int) chan LogLine {
-	channel := make(chan LogLine)
-	for i := 0; i < getIntOrDefault(procs, 100); i++ {
-		go func() {
-			for logline := range channel {
-				sendToElasticServer(logline)
-			}
-		}()
-	}
-	return channel
-}
-
-func getIntOrDefault(i, defaultInt int) int {
-	if i == 0 {
-		return defaultInt
-	}
-	return i
-}
-
-func sendToElasticServer(event LogLine) {
-	logJSON, err := json.Marshal(event)
-	if err != nil {
-		log.Printf("got an error while marshling event to json: %v", err)
-		return
-	}
-	res, err := esClient.Index(customerIndex, bytes.NewReader(logJSON))
-	if err != nil {
-		log.Printf("got an error while sending log to elastic search: %v", err)
-		return
-	}
-	if res.IsError() {
-		log.Printf("got an error response after sending logs to elastic search. response was: %v", res)
-	}
-	res.Body.Close()
-}
-
-// evaluate if we have all the flags needed to setup the elastic search client.
-func isValidELSConfig(service string, config elasticsearch.Config) bool {
-	if service == "" || len(config.Addresses) == 0 || config.Username == "" || config.Password == "" {
-		Warn("missing parameters for the elastic search client, skipping logging to it.")
-		return false
-	}
-	return true
-}
-
-// Debug will log a debug message
-func Debug(msg string) {
-	LogAs(DEBUG, msg)
-}
-
-// Debugf will log a debug message
-func Debugf(format string, a ...interface{}) {
-	LogfAs(DEBUG, format, a...)
-}
-
-// Info will log an info message
-func Info(msg string) {
-	LogAs(INFO, msg)
-}
-
-// Infof will log an info message
-func Infof(format string, a ...interface{}) {
-	LogfAs(INFO, format, a...)
-}
-
-// Warn will log a warn message
-func Warn(msg string) {
-	LogAs(WARN, msg)
-}
-
-// Warnf will log a warn message
-func Warnf(format string, a ...interface{}) {
-	LogfAs(WARN, format, a...)
-}
-
-// Err will log an error message
-func Err(msg string) {
-	LogAs(ERROR, msg)
-}
-
-// Errf will log an error message
-func Errf(format string, a ...interface{}) {
-	LogfAs(ERROR, format, a...)
-}
-
-// LogAs will log an error message with the given severity level
-func LogAs(severity Severity, msg string) {
-	Log(NewLogMsg(msg, severity))
-}
-
-// LogfAs will log an error message with the given severity level
-func LogfAs(severity Severity, format string, a ...interface{}) {
-	Log(NewLogMsg(fmt.Sprintf(format, a...), severity))
-}
-
-// Log will log all given error messages which are equal to or above the
-// current global severity level. Messages determined above the global
-// severity level, will be output to console as well as being sent to
-// elasicsearch (messages with `ERROR` or higher will be sent to SentryIO)
-func Log(msgs ...Message) {
-	for _, msg := range msgs {
-		if msg == nil {
-			return
-		}
-		if msg.Severity() <= ERROR {
-			raven.CaptureError(msg, SentryIOErrorTag(msg.Severity()))
-		}
-		if msg.Severity() <= logSeverity {
-			logline := LogLine{
-				Timestamp:   time.Now().UTC().Format(time.RFC3339),
-				Message:     msg.String(),
-				ServiceName: serviceName,
-				LogLevel:    msg.Severity().ToString(),
-			}
-			log.Printf(logline.String())
-
-			if esClient != nil {
-				logchannel <- logline
-			}
-		}
-	}
-}
-
-// LogLine is a struct containing all information necessary for sending
-// messages with sufficient metadata to elasticsearch
-type LogLine struct {
-	Timestamp   string `json:"@timestamp"`
-	Original    string `json:"event.original"`
-	Message     string `json:"message"`
-	ServiceName string `json:"service.name"`
-	LogLevel    string `json:"log.level"`
-}
-
-// String will return a string definition of the LogLine
-func (logline LogLine) String() string {
-	return fmt.Sprintf("%s [%s] %s", logline.Timestamp, logline.LogLevel, logline.Message)
-}
-
-// Messsage is an interface representing a log message
+// Message is an interface representing a log message
 type Message interface {
 	Severity() Severity
 	String() string
 	Error() string
 }
+
+// Severity represents the logging message severity
+type Severity int
 
 // LogMessage implements the Message interface and is the primary struct representing log messages
 type LogMessage struct {
@@ -234,8 +56,90 @@ func (msg LogMessage) Error() string {
 	return msg.String()
 }
 
-// Severity represents the logging message severity
-type Severity int
+// SetLogSeverity will determine which log to output to the console, as well as elasticsearch.
+// Anything equal to or higher in severity will be logged. In other words, if the severity
+// `ERROR` is passed to this function, the global logging level will be set to `ERROR` and will
+// therefore never log `DEBUG`, `INFO` & `WARNING`.
+func SetLogSeverity(severity Severity) {
+	glogger.severity = severity
+	glogger.LogfAs(INFO, "Log level set to: %s", severity.ToString())
+}
+
+// SetElasticClient will create an elasticsearch logger client, which the information given
+// on function invokation.
+func SetElasticClient(processors int, service string, config elasticsearch.Config) error {
+	glogger.destroy()
+	glogger = NewLogger(glogger.severity, processors)
+	return glogger.SetElasticClient(service, config)
+}
+
+// Debug will log a debug message
+func Debug(msg string) {
+	glogger.Debug(msg)
+}
+
+// Debugf will log a debug message
+func Debugf(format string, a ...interface{}) {
+	glogger.Debugf(format, a...)
+}
+
+// Info will log an info message
+func Info(msg string) {
+	glogger.Info(msg)
+}
+
+// Infof will log an info message
+func Infof(format string, a ...interface{}) {
+	glogger.Infof(format, a...)
+}
+
+// Warn will log a warn message
+func Warn(msg string) {
+	glogger.Warn(msg)
+}
+
+// Warnf will log a warn message
+func Warnf(format string, a ...interface{}) {
+	glogger.Warnf(format, a...)
+}
+
+// Err will log an error message
+func Err(msg string) {
+	glogger.Err(msg)
+}
+
+// Errf will log an error message
+func Errf(format string, a ...interface{}) {
+	glogger.Errf(format, a...)
+}
+
+// Fatal will log a fatal error message
+func Fatal(msg string) {
+	glogger.Fatal(msg)
+}
+
+// Fatalf will log a formatted fatal error message
+func Fatalf(format string, a ...interface{}) {
+	glogger.Fatalf(format, a...)
+}
+
+// LogAs will log an error message with the given severity level
+func LogAs(severity Severity, msg string) {
+	glogger.Log(NewLogMsg(msg, severity))
+}
+
+// LogfAs will log an error message with the given severity level
+func LogfAs(severity Severity, format string, a ...interface{}) {
+	glogger.Log(NewLogMsg(fmt.Sprintf(format, a...), severity))
+}
+
+// Log will log all given error messages which are equal to or above the
+// current global severity level. Messages determined above the global
+// severity level, will be output to console as well as being sent to
+// elasicsearch (messages with `ERROR` or higher will be sent to SentryIO)
+func Log(msgs ...Message) {
+	glogger.Log(msgs...)
+}
 
 // ToString will transform a Severity integer to it's
 // string representation, conforming to the error level
@@ -259,7 +163,7 @@ func (severity Severity) ToString() string {
 
 var (
 	// FATAL is an msgor severe enough to end an application
-	FATAL Severity = 0
+	FATAL Severity
 
 	// ERROR is an msgor which is unexpected, but not severe enough to exit the application
 	ERROR Severity = 1
