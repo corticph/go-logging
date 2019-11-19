@@ -7,19 +7,19 @@ import (
 	"gotest.tools/assert"
 )
 
-func reset(t *testing.T) {
-	t.Helper()
-
-	glogger.destroy()
-	glogger = NewLogger(INFO, 1)
-}
-
 func TestSetLogSeverity(t *testing.T) {
 	defer reset(t)
 
 	assert.Assert(t, glogger.severity == INFO)
 	SetLogSeverity(DEBUG)
 	assert.Assert(t, glogger.severity == DEBUG)
+}
+
+func reset(t *testing.T) {
+	t.Helper()
+
+	glogger.destroy()
+	glogger = NewLogger(INFO, 1)
 }
 
 func TestSetGlobalElasticClientTwiceNoParameters(t *testing.T) {
