@@ -7,13 +7,6 @@ import (
 	"gotest.tools/assert"
 )
 
-func reset(t *testing.T) {
-	t.Helper()
-
-	glogger.destroy()
-	glogger = NewLogger(INFO, 1)
-}
-
 func TestSetLogSeverity(t *testing.T) {
 	defer reset(t)
 
