@@ -9,6 +9,8 @@ import (
 	"github.com/getsentry/raven-go"
 )
 
+const defaultProcessesNumber = 100
+
 // Logger is a struct containing the functionality of the go-logging library
 // This can be used as a global logger, or specified class based logger
 type Logger struct {
@@ -17,6 +19,7 @@ type Logger struct {
 	severity    Severity
 	client      ElasticClient
 	cancel      context.CancelFunc
+	procs       int
 }
 
 // LogChannel is a wrapper around a chan LogLine
@@ -37,21 +40,28 @@ func (lchan LogChannel) Send(logline LogLine) {
 
 // NewLogger will initialise and return a new loggger
 func NewLogger(severity Severity, procs int) *Logger {
-	channel, cancel := newLogListener(procs)
-	return &Logger{
+	logger := Logger{
 		initialised: true,
 		severity:    severity,
-		logchannel: LogChannel{
-			channel: channel,
-		},
-		cancel: cancel,
+		procs:       procs,
 	}
+	logger.initializeLogger()
+	return &logger
 }
 
-func newLogListener(procs int) (chan LogLine, context.CancelFunc) {
+func (logger *Logger) initializeLogger() {
+	channel, cancel := logger.initializeChannel()
+	logger.logchannel = LogChannel{
+		channel: channel,
+	}
+	logger.cancel = cancel
+}
+
+func (logger *Logger) initializeChannel() (chan LogLine, context.CancelFunc) {
 	channel := make(chan LogLine)
+
 	ctx, cancel := context.WithCancel(context.Background())
-	for i := 0; i < getIntOrDefault(procs, 100); i++ {
+	for i := 0; i < getIntOrDefault(logger.procs, defaultProcessesNumber); i++ {
 		go func() {
 			for {
 				select {
@@ -64,7 +74,9 @@ func newLogListener(procs int) (chan LogLine, context.CancelFunc) {
 			}
 		}()
 	}
+
 	return channel, cancel
+
 }
 
 func getIntOrDefault(i, defaultInt int) int {
@@ -74,11 +86,10 @@ func getIntOrDefault(i, defaultInt int) int {
 	return i
 }
 
-func (logger *Logger) destroy() *Logger {
+func (logger *Logger) destroy() {
 	if logger.cancel != nil {
 		logger.cancel()
 	}
-	return NewLogger(INFO, 1)
 }
 
 // SetElasticClient will set the contained elastic client using the given input parameters
