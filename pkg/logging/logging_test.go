@@ -22,11 +22,11 @@ func reset(t *testing.T) {
 	glogger = NewLogger(INFO, 1)
 }
 
-func TestSetGlobalElasticClientTwiceNoParameters(t *testing.T) {
-	defer reset(t)
+func TestSetElasticClientTwiceNoParameters(t *testing.T) {
+	logger := NewLogger(INFO, 1)
 
-	assert.Assert(t, SetElasticClient(0, "go-logging-test", elasticsearch.Config{}) == nil)
-	assert.Assert(t, SetElasticClient(0, "go-logging-test", elasticsearch.Config{}) == nil)
+	assert.Assert(t, logger.SetElasticClient("go-logging-test", elasticsearch.Config{}) == nil)
+	assert.Assert(t, logger.SetElasticClient("go-logging-test", elasticsearch.Config{}) == nil)
 }
 
 func TestSetGlobalElasticClientWithParameters(t *testing.T) {
@@ -70,33 +70,4 @@ func TestWithoutElasticSearchInitialised(t *testing.T) {
 func TestNewLogger(t *testing.T) {
 	logger := NewLogger(INFO, 1)
 	assert.Assert(t, logger.severity == INFO)
-}
-
-func TestSetElasticClientTwiceNoParameters(t *testing.T) {
-	logger := NewLogger(INFO, 1)
-
-	assert.Assert(t, logger.SetElasticClient("go-logging-test", elasticsearch.Config{}) == nil)
-	assert.Assert(t, logger.SetElasticClient("go-logging-test", elasticsearch.Config{}) == nil)
-}
-
-func TestSetElasticClientWithParameters(t *testing.T) {
-	logger := NewLogger(INFO, 1)
-
-	assert.Assert(t, logger.SetElasticClient("go-logging-test", elasticsearch.Config{
-		Username:  "wrong",
-		Password:  "credentials",
-		Addresses: []string{"http://are.wrong.com"},
-	}) == nil)
-
-	SetLogSeverity(DEBUG)
-	Debug("message")
-	Debugf("mess%s", "age")
-	Info("message")
-	Infof("mess%s", "age")
-	Warnf("mess%s", "age")
-	Err("message")
-	Errf("mess%s", "age")
-	Fatal("message")
-	Fatalf("mess%s", "age")
-	Log(nil)
 }

@@ -9,6 +9,8 @@ import (
 	"github.com/getsentry/raven-go"
 )
 
+const defaultProcessesNumber = 100
+
 // Logger is a struct containing the functionality of the go-logging library
 // This can be used as a global logger, or specified class based logger
 type Logger struct {
@@ -59,7 +61,7 @@ func (logger *Logger) initializeChannel() (chan LogLine, context.CancelFunc) {
 	channel := make(chan LogLine)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	for i := 0; i < getIntOrDefault(logger.procs, 100); i++ {
+	for i := 0; i < getIntOrDefault(logger.procs, defaultProcessesNumber); i++ {
 		go func() {
 			for {
 				select {
