@@ -24,9 +24,6 @@ type Message interface {
 	Error() string
 }
 
-// Severity represents the logging message severity
-type Severity int
-
 // LogMessage implements the Message interface and is the primary struct representing log messages
 type LogMessage struct {
 	severity Severity
@@ -142,6 +139,9 @@ func LogfAs(severity Severity, format string, a ...interface{}) {
 func Log(msgs ...Message) {
 	glogger.Log(msgs...)
 }
+
+// Severity represents the logging message severity
+type Severity int
 
 // ToString will transform a Severity integer to it's
 // string representation, conforming to the error level
