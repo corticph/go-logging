@@ -12,7 +12,7 @@ import (
 type ElasticClient struct {
 	err      error
 	client   *elasticsearch.Client
-	service  string
+	name     string
 	customer string
 }
 
@@ -26,7 +26,7 @@ func NewElasticClient(service string, config elasticsearch.Config) ElasticClient
 	}
 	return ElasticClient{
 		customer: "logs-" + config.Username,
-		service:  service,
+		name:     service,
 		client:   client,
 	}
 }
@@ -40,13 +40,7 @@ func (client ElasticClient) send(event LogLine) {
 	if client.client == nil {
 		return
 	}
-	client.index(logJSON)
-
-}
-
-func (client ElasticClient) index(eventBytes []byte) {
-	res, err := client.client.Index(client.customer, bytes.NewReader(eventBytes))
-	res.Body.Close()
+	res, err := client.client.Index(client.customer, bytes.NewReader(logJSON))
 	if err != nil {
 		log.Printf("got an error while sending log to elastic search: %v", err)
 		return
@@ -54,4 +48,5 @@ func (client ElasticClient) index(eventBytes []byte) {
 	if res.IsError() {
 		log.Printf("got an error response after sending logs to elastic search. response was: %v", res)
 	}
+	res.Body.Close()
 }
