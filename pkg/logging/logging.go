@@ -66,9 +66,7 @@ func SetLogSeverity(severity Severity) {
 }
 
 // SetElasticClient will create an elasticsearch logger client, which the information given
-// on function invokation. You cannot instatiate the elastic client more than once, and any
-// attempt of setting it more than once, will produce an error. This is to avoid unwanted
-// processor instatiation.
+// on function invokation.
 func SetElasticClient(processors int, service string, config elasticsearch.Config) error {
 	glogger.destroy()
 	glogger = NewLogger(glogger.severity, processors)
